@@ -2,7 +2,6 @@ package com.example.hui.download;
 
 import android.os.AsyncTask;
 import android.os.Environment;
-import android.util.Log;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +32,7 @@ public class DownloadTask extends AsyncTask<String,Integer,Integer>{
     @Override
     protected Integer doInBackground(String... params) {
         InputStream is = null;
+        //实现断点续传的关键类
         RandomAccessFile savedFile = null;
         File file = null;
         try{
@@ -40,24 +40,27 @@ public class DownloadTask extends AsyncTask<String,Integer,Integer>{
             String downloadUrl = params[0];
             String fileName = downloadUrl.substring(downloadUrl.lastIndexOf("/"));
             String directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).getPath();
-            //打印出所在目录
-            Log.i("TAG",directory+fileName);
             file = new File(directory+fileName);
             if(file.exists()){
                 downloadLength = file.length();
             }
             long contentLength = getContentLength(downloadUrl);
+            //判断文件的长度，如果长度是0，那么url无效，返回失败
             if(contentLength == 0){
                 return TYPE_FAILED;
-            }else if(contentLength==downloadLength){
+            }
+            //如果已经下载的长度和资源的长度相同，那么就表明下载完成，返回成功。
+            else if(contentLength==downloadLength){
                 return TYPE_SUCCESS;
             }
+            //其他情况，构造okhttpClient
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder()
                     .addHeader("RANGE","bytes="+downloadLength+"-")
                     .url(downloadUrl)
                     .build();
             Response response = client.newCall(request).execute();
+            //获取服务器返回的数据
             if(response!=null){
                 is = response.body().byteStream();
                 savedFile = new RandomAccessFile(file,"rw");
@@ -84,6 +87,7 @@ public class DownloadTask extends AsyncTask<String,Integer,Integer>{
         }catch (Exception e){
             e.printStackTrace();
         }finally {
+            //关闭资源
             try {
                 if(is!=null)
                     is.close();
